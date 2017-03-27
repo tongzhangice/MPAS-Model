@@ -2,9 +2,9 @@
 
 
 OCEAN_SHARED_INCLUDES = -I$(PWD)/../framework -I$(PWD)/../external/esmf_time_f90 -I$(PWD)/../operators
-OCEAN_SHARED_INCLUDES += -I$(PWD)/BGC -I$(PWD)/shared -I$(PWD)/analysis_members -I$(PWD)/cvmix -I$(PWD)/mode_forward -I$(PWD)/mode_analysis -I$(PWD)/mode_init
+OCEAN_SHARED_INCLUDES += -I$(PWD)/BGC -I$(PWD)/MARBL -I$(PWD)/shared -I$(PWD)/analysis_members -I$(PWD)/cvmix -I$(PWD)/mode_forward -I$(PWD)/mode_analysis -I$(PWD)/mode_init
 
-all: shared libcvmix analysis_members libBGC
+all: shared libcvmix analysis_members libBGC libMARBL
 	(cd mode_forward; $(MAKE) FCINCLUDES="$(FCINCLUDES) $(OCEAN_SHARED_INCLUDES)" all )
 	(cd mode_analysis; $(MAKE) FCINCLUDES="$(FCINCLUDES) $(OCEAN_SHARED_INCLUDES)" all )
 	(cd mode_init; $(MAKE) FCINCLUDES="$(FCINCLUDES) $(OCEAN_SHARED_INCLUDES)" all )
@@ -53,6 +53,10 @@ BGC_source: get_BGC.sh
 	(/bin/bash ./get_BGC.sh)
 	(cd BGC)
 
+MARBL_source: get_MARBL.sh
+	(/bin/bash ./get_MARBL.sh)
+	(cd MARBL)
+
 libcvmix: cvmix_source
 	if [ -d cvmix ]; then \
 		(cd cvmix; make all FC="$(FC)" FCFLAGS="$(FFLAGS)" FINCLUDES="$(FINCLUDES)") \
@@ -67,7 +71,14 @@ libBGC: BGC_source
 		(exit 1) \
 	fi
 
-shared: libcvmix libBGC
+libMARBL: MARBL_source
+	if [ -d MARBL ]; then \
+		(cp Makefile.MARBL MARBL/Makefile; cd MARBL; make all FC="$(FC)" FCFLAGS="$(FFLAGS)" FINCLUDES="$(FINCLUDES)") \
+	else \
+		(exit 1) \
+	fi
+
+shared: libcvmix libBGC libMARBL
 	(cd shared; $(MAKE) FCINCLUDES="$(FCINCLUDES) $(OCEAN_SHARED_INCLUDES)")
 
 analysis_members: libcvmix shared
@@ -82,6 +93,9 @@ clean:
 	fi
 	if [ -d BGC ]; then \
 		(cd BGC; make clean) \
+	fi
+	if [ -d MARBL ]; then \
+		(cd MARBL; make clean) \
 	fi
 	(cd mode_forward; $(MAKE) clean)
 	(cd mode_analysis; $(MAKE) clean)
