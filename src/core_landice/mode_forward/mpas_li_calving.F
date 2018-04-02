@@ -966,8 +966,9 @@ module li_calving
       integer, dimension(:,:), pointer :: edgesOnCell
       real (kind=RKIND), dimension(:), pointer :: dvEdge
       integer, pointer :: nCells
-      integer :: iCell, jCell, iNeighbor
+      integer :: iCell, jCell, iNeighbor, upstreamNeighborNum
       real(kind=RKIND) :: cellCalvingFrontLength, cellCalvingFrontHeight
+      real(kind=RKIND) :: upstreamNeighborEminSum, upstreamNeighborEmaxSum, eMaxAverageValue, eMinAverageValue
       integer :: err_tmp
 
       err = 0
@@ -1034,6 +1035,30 @@ module li_calving
          ! First calculate the front retreat rate (Levermann eq. 1)
          calvingVelocity(:) = eigencalvingParameter(:) * max(0.0_RKIND, eMax(:)) * max(0.0_RKIND, eMin(:)) & ! m/s
                * real(li_mask_is_floating_ice_int(cellMask(:)), kind=RKIND) ! calculate only for floating ice - map of "potential" calving rate
+
+         do iCell = 1, nCells
+            if (calvingFrontMask(iCell) == 1) then
+               upstreamNeighborNum = 0
+               upstreamNeighborEmaxSum = 0
+               upstreamNeighborEminSum = 0
+               do iNeighbor = 1, nEdgesOnCell(iCell)
+                  jCell = cellsOnCell(iNeighbor, iCell)
+                  if ( li_mask_is_floating_ice(cellMask(jCell)) .and. li_mask_is_dynamic_ice(cellMask(jCell)) .and. .not. &
+                       calvingFrontMask(jCell) == 1 ) then ! find neighbor cells that are not thin, not ocean and not calving front
+                       upstreamNeighborNum = upstreamNeighborNum + 1
+                       upstreamNeighborEmaxSum = upstreamNeighborEmaxSum + eMax(jCell)
+                       upstreamNeighborEminSum = upstreamNeighborEminSum + eMin(jCell)
+                  endif
+               enddo
+               eMaxAverageValue = upstreamNeighborEmaxSum / upstreamNeighborNum
+               eMinAverageValue = upstreamNeighborEminSum / upstreamNeighborNum
+
+               calvingVelocity(iCell) = eigencalvingParameter(iCell) * max(0.0_RKIND, eMaxAverageValue) * max(0.0_RKIND, eMinAverageValue)
+            endif
+         enddo
+
+
+
          do iCell = 1, nCells
             if (calvingFrontMask(iCell) == 1) then
 
