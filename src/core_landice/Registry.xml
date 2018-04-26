@@ -961,6 +961,10 @@ is the value of that variable from the *previous* time level!
 		     description="magnitude of second principal strain rate"
 		/>
 
+    <var name="groundinglineFlux" type="real" dimensions="nCells Time" units="kg m^{-2} s^{-1}"
+		     description="ice flux across cells along the grounding line"
+		/>
+
 		<!-- Variables only needed by HO solver -->
 		<var name="anyDynamicVertexMaskChanged"              type="integer"  dimensions="Time"
 		     units="none"  description="flag needed by external velocity solvers that indicates if the region to solve on the block's domain has changed (treated as a logical)"

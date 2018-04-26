@@ -1076,6 +1076,7 @@ module li_advection
     subroutine advect_thickness_tracers_upwind(&
          dt,                     &
          meshPool,               &
+         velocityPool,           &
          layerNormalVelocity,    &
          layerThicknessEdge,     &
          layerThicknessOld,      &
@@ -1169,7 +1170,8 @@ module li_advection
            invAreaCell,            & ! 1.0/areaCell
            thicknessFluxEdge,      & ! thickness flux on an edge
            thicknessTendency,      & ! net thickness tendency for a cell
-           newThickness              ! new layer thickness
+           newThickness,           & ! new layer thickness
+           cellGLflux                ! groundinglineFlux across a cell
 
       integer :: iEdge, iCell, iCell1, iCell2, iEdgeOnCell, k
 
@@ -1228,6 +1230,8 @@ module li_advection
       call mpas_pool_get_array(meshPool, 'indexToCellID', indexToCellID)
       call mpas_pool_get_array(meshPool, 'indexToEdgeID', indexToEdgeID)
 
+      call mpas_pool_get_array(velocityPool, 'groundinglineFlux', groundinglineFlux)
+
       ! get config variables
       call mpas_pool_get_config(liConfigs, 'config_print_thickness_advection_info', config_print_thickness_advection_info)
       call mpas_pool_get_config(liConfigs, 'config_stats_cell_ID', config_stats_cell_ID)
@@ -1265,6 +1269,8 @@ module li_advection
             thicknessTendency = 0.0_RKIND
             thicknessTracerTendency(:) = 0.0_RKIND
 
+            cellGLflux = 0.0_RKIND
+
             ! compute fluxes for each edge of the cell
             do iEdgeOnCell = 1, nEdgesOnCell(iCell)
 
@@ -1291,7 +1297,7 @@ module li_advection
                    endif
 
                    ! Loop over levels
-                   blockGLflux = blockGLflux + fluxSign * layerNormalVelocity(k, iEdge) * dvEdge(iEdge) * layerThicknessEdge(k, iEdge) 
+                   cellGLflux = cellGLflux + fluxSign * layerNormalVelocity(k, iEdge) * dvEdge(iEdge) * layerThicknessEdge(k, iEdge) 
                    !do k = 1, nVertLevels
                       ! Flux across GL, units = kg/yr
                    !   blockGLflux = blockGLflux + fluxSign * layerNormalVelocity(k, iEdge) * dvEdge(iEdge) * layerThicknessEdge(k, iEdge) &
@@ -1299,6 +1305,7 @@ module li_advection
                    !end do ! end loop over levels
                 end if ! if GL
 
+                groundinglineFlux(iCell) = cellGLflux / areaCell(iCell)
 
 
                if (advectTracers) then
