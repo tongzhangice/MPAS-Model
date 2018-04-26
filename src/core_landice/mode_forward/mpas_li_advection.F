@@ -1278,6 +1278,29 @@ module li_advection
                thicknessTendency = thicknessTendency &
                                  + edgeSignOnCell(iEdgeOnCell,iCell) * thicknessFluxEdge * invAreaCell
 
+
+                if (li_mask_is_grounding_line(edgeMask(iEdge))) then
+                   ! Determine sign of this edge relative to GL
+                   ! (+=grounded to floating, -=floating to grounded)
+                   iCell1 = cellsOnEdge(1,iEdge)
+                   iCell2 = cellsOnEdge(2,iEdge)
+                   if (li_mask_is_grounded_ice(cellMask(iCell1))) then
+                      fluxSign = 1.0_RKIND
+                   else
+                      fluxSign = -1.0_RKIND
+                   endif
+
+                   ! Loop over levels
+                   blockGLflux = blockGLflux + fluxSign * layerNormalVelocity(k, iEdge) * dvEdge(iEdge) * layerThicknessEdge(k, iEdge) 
+                   !do k = 1, nVertLevels
+                      ! Flux across GL, units = kg/yr
+                   !   blockGLflux = blockGLflux + fluxSign * layerNormalVelocity(k, iEdge) * dvEdge(iEdge) * layerThicknessEdge(k, iEdge) &
+                   !       * scyr * config_ice_density  ! convert from m^3/s to kg/yr
+                   !end do ! end loop over levels
+                end if ! if GL
+
+
+
                if (advectTracers) then
 
                   velSign = sign(1.0_RKIND, layerNormalVelocity(k,iEdge))
