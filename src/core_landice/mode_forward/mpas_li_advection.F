@@ -358,6 +358,8 @@ module li_advection
          call advect_thickness_tracers_upwind(&
               dt,                      &
               meshPool,                &
+              velocityPool,            &
+              geometryPool,            &
               layerNormalVelocity,     &
               layerThicknessEdge,      &
               layerThicknessOld,       &
@@ -1077,6 +1079,7 @@ module li_advection
          dt,                     &
          meshPool,               &
          velocityPool,           &
+         geometryPool,           &
          layerNormalVelocity,    &
          layerThicknessEdge,     &
          layerThicknessOld,      &
@@ -1098,6 +1101,9 @@ module li_advection
       type (mpas_pool_type), intent(in) :: &
            meshPool              !< Input: mesh information
 
+      type (mpas_pool_type), intent(in) :: &
+           geometryPool              !< Input: geometry information
+
       real (kind=RKIND), dimension(:,:), intent(in) :: &
            layerNormalVelocity,& !< Input: normal velocity averaged from interfaces to layer midpoints
            layerThicknessEdge    !< Input: layer thickness on upstream edge
@@ -1117,6 +1123,8 @@ module li_advection
       ! input/output variables
       !
       !-----------------------------------------------------------------
+      type (mpas_pool_type), intent(inout) :: &
+           velocityPool              !< Input: geometry information
 
       !-----------------------------------------------------------------
       !
@@ -1171,7 +1179,8 @@ module li_advection
            thicknessFluxEdge,      & ! thickness flux on an edge
            thicknessTendency,      & ! net thickness tendency for a cell
            newThickness,           & ! new layer thickness
-           cellGLflux                ! groundinglineFlux across a cell
+           cellGLflux,             & ! groundinglineFlux across a cell
+           fluxSign
 
       integer :: iEdge, iCell, iCell1, iCell2, iEdgeOnCell, k
 
@@ -1188,6 +1197,13 @@ module li_advection
       ! This is ~300 million years in seconds, but it is small enough not to overflow
 
       real(kind=RKIND) :: velSign     ! = 1.0_RKIND or -1.0_RKIND depending on sign of velocity
+
+      real(kind=RKIND), dimension(:), pointer :: &
+           groundinglineFlux     !< Output: cell grounding line flux
+
+      integer, dimension(:), pointer :: &
+           cellMask,          & !integer bitmask for cells
+           edgeMask             !integer bitmask for cells
 
       integer :: err_tmp
 
@@ -1231,6 +1247,8 @@ module li_advection
       call mpas_pool_get_array(meshPool, 'indexToEdgeID', indexToEdgeID)
 
       call mpas_pool_get_array(velocityPool, 'groundinglineFlux', groundinglineFlux)
+      call mpas_pool_get_array(geometryPool, 'cellMask', cellMask)
+      call mpas_pool_get_array(geometryPool, 'edgeMask', edgeMask)
 
       ! get config variables
       call mpas_pool_get_config(liConfigs, 'config_print_thickness_advection_info', config_print_thickness_advection_info)
