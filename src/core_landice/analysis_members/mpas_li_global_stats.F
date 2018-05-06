@@ -172,7 +172,7 @@ contains
       real (kind=RKIND), dimension(:), pointer ::  thickness
       real (kind=RKIND), dimension(:), pointer ::  bedTopography
       real (kind=RKIND), dimension(:), pointer ::  sfcMassBal
-      real (kind=RKIND), dimension(:), pointer ::  groundedrSfcMassBal
+      real (kind=RKIND), dimension(:), pointer ::  groundedSfcMassBal
       real (kind=RKIND), dimension(:), pointer ::  basalMassBal
       real (kind=RKIND), dimension(:), pointer ::  groundedBasalMassBal
       real (kind=RKIND), dimension(:), pointer ::  floatingBasalMassBal
@@ -333,7 +333,7 @@ contains
             !SFP: These calculations need to be tested still
             blockSumSfcMassBal = blockSumSfcMassBal + real(li_mask_is_ice_int(cellMask(iCell)),RKIND) &
                 * areaCell(iCell) * sfcMassBal(iCell) * scyr
-            blockSumGroundedSfcMassBal = blockGroundedSumSfcMassBal + real(li_mask_is_grounded_ice(cellMask(iCell)),RKIND) &
+            blockSumGroundedSfcMassBal = blockSumGroundedSfcMassBal + real(li_mask_is_grounded_ice_int(cellMask(iCell)),RKIND) &
                 * areaCell(iCell) * sfcMassBal(iCell) * scyr
             blockSumBasalMassBal = blockSumBasalMassBal + real(li_mask_is_ice_int(cellMask(iCell)),RKIND) &
                 * areaCell(iCell) * basalMassBal(iCell) * scyr
