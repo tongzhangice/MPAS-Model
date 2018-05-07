@@ -172,7 +172,7 @@ contains
       real (kind=RKIND), dimension(:), pointer ::  thickness
       real (kind=RKIND), dimension(:), pointer ::  bedTopography
       real (kind=RKIND), dimension(:), pointer ::  sfcMassBal
-      real (kind=RKIND), dimension(:), pointer ::  groundedSfcMassBal
+      !real (kind=RKIND), dimension(:), pointer ::  groundedSfcMassBal
       real (kind=RKIND), dimension(:), pointer ::  basalMassBal
       real (kind=RKIND), dimension(:), pointer ::  groundedBasalMassBal
       real (kind=RKIND), dimension(:), pointer ::  floatingBasalMassBal
@@ -289,7 +289,7 @@ contains
          call mpas_pool_get_array(geometryPool, 'cellMask', cellMask)
          call mpas_pool_get_array(geometryPool, 'edgeMask', edgeMask)
          call mpas_pool_get_array(geometryPool, 'sfcMassBal', sfcMassBal)
-         call mpas_pool_get_array(geometryPool, 'groundedSfcMassBal', groundedSfcMassBal)
+         !call mpas_pool_get_array(geometryPool, 'groundedSfcMassBal', groundedSfcMassBal)
          call mpas_pool_get_array(geometryPool, 'basalMassBal', basalMassBal)
          call mpas_pool_get_array(geometryPool, 'groundedBasalMassBal', groundedBasalMassBal)
          call mpas_pool_get_array(geometryPool, 'floatingBasalMassBal', floatingBasalMassBal)
@@ -331,10 +331,10 @@ contains
 
             ! sfc and basal mass balance (kg yr^{-1})
             !SFP: These calculations need to be tested still
-            blockSumSfcMassBal = blockSumSfcMassBal + real(li_mask_is_ice_int(cellMask(iCell)),RKIND) &
+            blockSumSfcMassBal = blockSumSfcMassBal + real(li_mask_is_grounded_ice_int(cellMask(iCell)),RKIND) &
                 * areaCell(iCell) * sfcMassBal(iCell) * scyr
-            blockSumGroundedSfcMassBal = blockSumGroundedSfcMassBal + real(li_mask_is_grounded_ice_int(cellMask(iCell)),RKIND) &
-                * areaCell(iCell) * sfcMassBal(iCell) * scyr
+            !blockSumGroundedSfcMassBal = blockSumGroundedSfcMassBal + real(li_mask_is_ice_int(cellMask(iCell)),RKIND) &
+            !    * areaCell(iCell) * sfcMassBal(iCell) * scyr
             blockSumBasalMassBal = blockSumBasalMassBal + real(li_mask_is_ice_int(cellMask(iCell)),RKIND) &
                 * areaCell(iCell) * basalMassBal(iCell) * scyr
             blockSumGroundedBasalMassBal = blockSumGroundedBasalMassBal + real(li_mask_is_ice_int(cellMask(iCell)),RKIND) &
@@ -423,8 +423,8 @@ contains
       sums(11) = blockSumCalvingFlux
       sums(12) = blockSumVAF
       sums(13) = blockGLflux
-      sums(14) = blockSumGroundedSfcMassBal
-      nVars = 14
+      !sums(14) = blockSumGroundedSfcMassBal
+      nVars = 13
 
       call mpas_dmpar_sum_real_array(dminfo, nVars, sums(1:nVars), reductions(1:nVars))
 
@@ -441,7 +441,7 @@ contains
          call mpas_pool_get_array(globalStatsAMPool, 'groundedIceVolume', groundedIceVolume)
          call mpas_pool_get_array(globalStatsAMPool, 'iceThicknessMean', iceThicknessMean)
          call mpas_pool_get_array(globalStatsAMPool, 'totalSfcMassBal', totalSfcMassBal)
-         call mpas_pool_get_array(globalStatsAMPool, 'totalGroundedSfcMassBal', totalGroundedSfcMassBal)
+         !call mpas_pool_get_array(globalStatsAMPool, 'totalGroundedSfcMassBal', totalGroundedSfcMassBal)
          call mpas_pool_get_array(globalStatsAMPool, 'avgNetAccumulation', avgNetAccumulation)
          call mpas_pool_get_array(globalStatsAMPool, 'totalBasalMassBal', totalBasalMassBal)
          call mpas_pool_get_array(globalStatsAMPool, 'totalGroundedBasalMassBal', totalGroundedBasalMassBal)
@@ -464,7 +464,7 @@ contains
          totalCalvingFlux = reductions(11)
          volumeAboveFloatation = reductions(12)
          groundingLineFlux = reductions(13)
-         totalGroundedSfcMassBal = reductions(14)
+         !totalGroundedSfcMassBal = reductions(14)
 
          iceThicknessMean = totalIceVolume / totalIceArea
          avgNetAccumulation = totalSfcMassBal / totalIceArea / rhoi
