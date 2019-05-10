@@ -1065,6 +1065,213 @@ module li_calving
 
    end subroutine eigencalving
 
+!|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+!
+!    routine damagecalving
+!
+!> \brief Calve ice from the calving front based on the Bassis-Ma (2015) damage theory 
+!> \author Tong Zhang
+!> \date   May. 2019
+!> \details Calve using damage model
+!> Bassis, Jeremy N., and Y. Ma. "Evolution of basal crevasses links ice shelf stability to ocean forcing." 
+!> Earth and Planetary Science Letters 409 (2015): 203-211.
+
+!-----------------------------------------------------------------------
+   subroutine damagecalving(domain, err)
+
+      !-----------------------------------------------------------------
+      ! input variables
+      !-----------------------------------------------------------------
+
+      !-----------------------------------------------------------------
+      ! input/output variables
+      !-----------------------------------------------------------------
+      type (domain_type), intent(inout) :: &
+         domain          !< Input/Output: domain object
+
+      !-----------------------------------------------------------------
+      ! output variables
+      !-----------------------------------------------------------------
+      integer, intent(out) :: err !< Output: error flag
+
+      !-----------------------------------------------------------------
+      ! local variables
+      !-----------------------------------------------------------------
+      type (block_type), pointer :: block
+      type (mpas_pool_type), pointer :: geometryPool
+      type (mpas_pool_type), pointer :: meshPool
+      type (mpas_pool_type), pointer :: velocityPool
+      type (mpas_pool_type), pointer :: scratchPool
+      real(kind=RKIND), pointer :: config_calving_eigencalving_parameter_scalar_value
+      character (len=StrKIND), pointer :: config_calving_eigencalving_parameter_source
+      logical, pointer :: config_print_calving_info
+      real (kind=RKIND), pointer :: config_sea_level
+      real (kind=RKIND), dimension(:), pointer :: thickness
+      real (kind=RKIND), dimension(:), pointer :: bedTopography
+      real (kind=RKIND), dimension(:), pointer :: eigencalvingParameter
+      real (kind=RKIND), dimension(:), pointer :: calvingThickness
+      real (kind=RKIND), dimension(:), pointer :: requiredCalvingVolumeRate
+      real (kind=RKIND), dimension(:), pointer :: calvingVelocity
+      real (kind=RKIND), dimension(:), pointer :: eMax, eMin
+      integer, dimension(:), pointer :: cellMask
+      type (field1dInteger), pointer :: calvingFrontMaskField
+      integer, dimension(:), pointer :: calvingFrontMask
+      real (kind=RKIND), pointer :: deltat  !< time step (s)
+      integer, dimension(:), pointer :: nEdgesOnCell ! number of cells that border each cell
+      integer, dimension(:,:), pointer :: cellsOnCell ! list of cells that neighbor each cell
+      integer, dimension(:,:), pointer :: edgesOnCell
+      real (kind=RKIND), dimension(:), pointer :: dvEdge
+      integer, pointer :: nCells
+      integer :: iCell, jCell, iNeighbor
+      real(kind=RKIND) :: cellCalvingFrontLength, cellCalvingFrontHeight
+      integer :: err_tmp
+
+      err = 0
+
+      call mpas_pool_get_config(liConfigs, 'config_print_calving_info', config_print_calving_info)
+      call mpas_pool_get_config(liConfigs, 'config_calving_eigencalving_parameter_scalar_value', &
+               config_calving_eigencalving_parameter_scalar_value)
+      call mpas_pool_get_config(liConfigs, 'config_calving_eigencalving_parameter_source', config_calving_eigencalving_parameter_source)
+      call mpas_pool_get_config(liConfigs, 'config_sea_level', config_sea_level)
+
+      ! block loop
+      block => domain % blocklist
+      do while (associated(block))
+
+         ! get pools
+         call mpas_pool_get_subpool(block % structs, 'geometry', geometryPool)
+         call mpas_pool_get_subpool(block % structs, 'velocity', velocityPool)
+         call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
+         call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
+
+         ! get fields
+         call mpas_pool_get_dimension(meshPool, 'nCells', nCells)
+         call mpas_pool_get_array(meshPool, 'deltat', deltat)
+         call mpas_pool_get_array(meshPool, 'nEdgesOnCell', nEdgesOnCell)
+         call mpas_pool_get_array(meshPool, 'edgesOnCell', edgesOnCell)
+         call mpas_pool_get_array(meshPool, 'cellsOnCell', cellsOnCell)
+         call mpas_pool_get_array(meshPool, 'dvEdge', dvEdge)
+         call mpas_pool_get_array(geometryPool, 'calvingThickness', calvingThickness)
+         call mpas_pool_get_array(geometryPool, 'cellMask', cellMask)
+         call mpas_pool_get_array(geometryPool, 'thickness', thickness)
+         call mpas_pool_get_array(geometryPool, 'bedTopography', bedTopography)
+         call mpas_pool_get_array(geometryPool, 'eigencalvingParameter', eigencalvingParameter)
+         call mpas_pool_get_array(geometryPool, 'requiredCalvingVolumeRate', requiredCalvingVolumeRate)
+         call mpas_pool_get_array(geometryPool, 'calvingVelocity', calvingVelocity)
+         call mpas_pool_get_array(velocityPool, 'eMax', eMax)
+         call mpas_pool_get_array(velocityPool, 'eMin', eMin)
+         call mpas_pool_get_array(velocityPool, 'exx', exx)
+         call mpas_pool_get_array(velocityPool, 'exy', exy)
+         call mpas_pool_get_array(velocityPool, 'eyx', eyx)
+         call mpas_pool_get_array(velocityPool, 'eyy', eyy)
+
+         call mpas_pool_get_array(thermalPool, 'temperature', temperature)
+         call mpas_pool_get_array(thermalPool, 'surfaceTemperature', surfaceTemperature)
+         call mpas_pool_get_array(thermalPool, 'basalTemperature', basalTemperature)
+
+         call mpas_pool_get_array(geometryPool, 'floatingBasalMassBal', floatingBasalMassBal)
+
+         call mpas_pool_get_field(scratchPool, 'iceCellMask2',  calvingFrontMaskField)
+         call mpas_allocate_scratch_field(calvingFrontMaskField, .true.)
+         calvingFrontMask => calvingFrontMaskField % array
+
+         meanT(:) = (surfaceTemperature(:)+basalTemperature(:))/2.0d0
+         ! use this simple math to estimate the mean T, temporarily 
+         ! TODO: accurately compute meanT from temperature
+
+         !meanT[meanT==0] = 263.15 # for cells that contains invalid T data
+         ! in case there is zero (NAN) temperature data somewhere
+
+         A = A01*np.exp(-Q1/R/meanT)
+         A[meanT<=263.15] = A01*np.exp(-Q1/R/meanT[meanT<=263.15])
+         A[meanT>263.15] = A02*np.exp(-Q2/R/meanT[meanT>263.15])
+         strainRate_e(:) = sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2)
+         visc(:) = 0.5*A**(-1.0/n)*(strainRate_e(:)+eps)**((1.0-n)/n)
+         ! recover effective viscosity from vel. and temp. fields
+
+         sigma_xx_d(:) = 2*visc(:)*exx(:)
+         sigma_yy_d(:) = 2*visc(:)*eyy(:)
+         sigma_xy(:) = 2*visc(:)*(exy(:)+eyx(:))/2.0
+         sigma_yx(:) = 2*visc(:)*(eyx(:)+exy(:))/2.0
+         ! after tests, the real e_xy and e_yx equal (exy+eyx)/2 for the MALI outputs
+
+         sigma_xx(:) = 2*sigma_xx_d(:)+sigma_yy_d(:)
+         sigma_yy(:) = 2*sigma_yy_d(:)+sigma_xx_d(:)
+
+         sigma_min = (sigma_xx+sigma_yy)/2.0-np.sqrt(((sigma_xx-sigma_yy)/2.0)**2+((sigma_xy+sigma_yx)/2)**2)
+         sigma_max = (sigma_xx+sigma_yy)/2.0+np.sqrt(((sigma_xx-sigma_yy)/2.0)**2+((sigma_xy+sigma_yx)/2)**2)
+
+         alpha(:) = sigma_min(:) / sigma_max(:)
+         eps_max(:) = sigma_max(:) / (2.0d0*visc(:))
+
+         nstar = 12.0d0*(1.0d0+alpha+alpha**2)/(4.0d0*(1.0d0+alpha+alpha**2)+6.0d0*alpha**2) 
+          ! Compute the effective flow law exponent
+
+         szero = rhoi*(rhoo-rhoi)*grav*thickness(:)/(2.0d0*sigma_max(:)*rhoo)
+          ! Compute the hydrostatic to tensile stress ratio
+
+         source = nstar * (1.0d0-szero)*eps_max-floatingBasalMassBal/thickness
+
+         d_damage_dt(:,i,j) = source(:,i,j) * damage(:,i,j)
+
+         calving%damage(:,i,j) = calving%damage(:,i,j) + d_damage_dt(:,i,j) * dt
+
+         ! get parameter value
+         if (trim(config_calving_eigencalving_parameter_source) == 'scalar') then
+            eigencalvingParameter = config_calving_eigencalving_parameter_scalar_value
+         elseif (trim(config_calving_eigencalving_parameter_source) == 'data') then
+            ! do nothing - use value from input file
+         else
+            err = 1
+            call mpas_log_write("Invalid value specified for option config_calving_eigencalving_parameter_source" // &
+                  config_calving_eigencalving_parameter_source, MPAS_LOG_ERR)
+         endif
+
+         if (config_print_calving_info) then
+            call mpas_log_write("eigencalvingParameter (m s) value range: Min=$r, Max=$r", &
+                    realArgs=(/minval(eigencalvingParameter), maxval(eigencalvingParameter)/))
+         endif
+
+         ! make mask for effective calving front.
+         ! This is last dynamic cell, but also make sure it has a neighbor that is open ocean or thin floating ice.
+         call calculate_calving_front_mask(meshPool, geometryPool, calvingFrontMask)
+
+         calvingVelocity(:) = 0.0_RKIND
+         requiredCalvingVolumeRate(:) = 0.0_RKIND
+         ! First calculate the front retreat rate (Levermann eq. 1)
+         calvingVelocity(:) = eigencalvingParameter(:) * max(0.0_RKIND, eMax(:)) * max(0.0_RKIND, eMin(:)) & ! m/s
+               * real(li_mask_is_floating_ice_int(cellMask(:)), kind=RKIND) ! calculate only for floating ice - map of "potential" calving rate
+         do iCell = 1, nCells
+            if (calvingFrontMask(iCell) == 1) then
+
+               ! convert to a volume flux per cell masking some assumptions
+               ! get front length from edge lengths abutting ocean or thin ice
+               ! get front height from max thickness of neighbors (since thickness near the edge could be screwy)
+               cellCalvingFrontLength = 0.0_RKIND
+               cellCalvingFrontHeight = 0.0_RKIND
+               do iNeighbor = 1, nEdgesOnCell(iCell)
+                  jCell = cellsOnCell(iNeighbor, iCell)
+                  if ( (li_mask_is_floating_ice(cellMask(jCell)) .and. .not. li_mask_is_dynamic_ice(cellMask(jCell))) .or. &  ! thin ice
+                       (.not. li_mask_is_ice(cellMask(jCell)) .and. bedTopography(jCell) < config_sea_level) ) then  ! open ocean
+                       cellCalvingFrontLength = cellCalvingFrontLength + dvEdge(edgesOnCell(iNeighbor, iCell))
+                  endif
+                  cellCalvingFrontHeight = max(cellCalvingFrontHeight, thickness(jCell))
+               enddo
+
+               requiredCalvingVolumeRate(iCell) = calvingVelocity(iCell) * cellCalvingFrontLength * cellCalvingFrontHeight ! m^3/s
+            endif
+         enddo
+
+         call distribute_calving_flux(meshPool, geometryPool, scratchPool, calvingFrontMask, err_tmp)
+         err = ior(err, err_tmp)
+
+         call mpas_deallocate_scratch_field(calvingFrontMaskField, .true.)
+
+         block => block % next
+      enddo
+
+   end subroutine eigencalving
+
 
 !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 !
