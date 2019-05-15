@@ -1157,6 +1157,8 @@ module li_calving
          call mpas_pool_get_array(geometryPool, 'bedTopography', bedTopography)
          call mpas_pool_get_array(geometryPool, 'eigencalvingParameter', eigencalvingParameter)
          call mpas_pool_get_array(geometryPool, 'requiredCalvingVolumeRate', requiredCalvingVolumeRate)
+         call mpas_pool_get_array(geometryPool, 'damage', damage)
+
          call mpas_pool_get_array(geometryPool, 'calvingVelocity', calvingVelocity)
          call mpas_pool_get_array(velocityPool, 'eMax', eMax)
          call mpas_pool_get_array(velocityPool, 'eMin', eMin)
@@ -1164,6 +1166,7 @@ module li_calving
          call mpas_pool_get_array(velocityPool, 'exy', exy)
          call mpas_pool_get_array(velocityPool, 'eyx', eyx)
          call mpas_pool_get_array(velocityPool, 'eyy', eyy)
+         call mpas_pool_get_array(velocityPool, 'flowParamA', flowParamA)
 
          call mpas_pool_get_array(thermalPool, 'temperature', temperature)
          call mpas_pool_get_array(thermalPool, 'surfaceTemperature', surfaceTemperature)
@@ -1175,62 +1178,116 @@ module li_calving
          call mpas_allocate_scratch_field(calvingFrontMaskField, .true.)
          calvingFrontMask => calvingFrontMaskField % array
 
-         meanT(:) = (surfaceTemperature(:)+basalTemperature(:))/2.0d0
+         call mpas_pool_get_field(scratchPool, 'meanFlowParamAField',  meanFlowParamAField)
+         call mpas_allocate_scratch_field(meanFlowParamAField, .true.)
+         meanFlowParamA => meanFlowParamAField % array
+
+         call mpas_pool_get_field(scratchPool, 'viscField',  viscField)
+         call mpas_allocate_scratch_field(viscField, .true.)
+         visc => viscField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmaxxField', sigmaxxField )
+         call mpas_allocate_scratch_field(sigmaxxField, .true.)
+         sigmaxx => sigmaxxField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmayyField', sigmayyField )
+         call mpas_allocate_scratch_field(sigmayyField, .true.)
+         sigmayy => sigmayyField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmaminField', sigmaminField )
+         call mpas_allocate_scratch_field(sigmaminField, .true.)
+         sigmamin => sigmaminField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmamaxField', sigmamaxField )
+         call mpas_allocate_scratch_field(sigmamaxField, .true.)
+         sigmamax => sigmamaxField % array
+
+         call mpas_pool_get_field(scratchPool, 'alphaField', alphaField )
+         call mpas_allocate_scratch_field(alphaField, .true.)
+         alpha => alphaField % array
+
+         call mpas_pool_get_field(scratchPool, 'epsmaxField', epsmaxField )
+         call mpas_allocate_scratch_field(epsmaxField, .true.)
+         epsmax => epsmaxField % array
+
+         call mpas_pool_get_field(scratchPool, 'nstarField', nstarField )
+         call mpas_allocate_scratch_field(nstarField, .true.)
+         nstar => nstarField % array
+
+         call mpas_pool_get_field(scratchPool, 'szeroField', szeroField )
+         call mpas_allocate_scratch_field(szeroField, .true.)
+         szero => szeroField % array
+
+         call mpas_pool_get_field(scratchPool, 'sourceField', sourceField )
+         call mpas_allocate_scratch_field(sourceField, .true.)
+         source => sourceField % array
+
+         call mpas_pool_get_field(scratchPool, 'ddamagedtField', ddamagedtField )
+         call mpas_allocate_scratch_field(ddamagedtField, .true.)
+         ddamagedt => ddamagedtField % array
+
+         ! call mpas_pool_get_field(scratchPool, 'damageField', damageField )
+         ! call mpas_allocate_scratch_field(damageField, .true.)
+         ! damage => damageField % array
+
+         ! meanT(:) = (surfaceTemperature(:)+basalTemperature(:))/2.0d0
          ! use this simple math to estimate the mean T, temporarily 
          ! TODO: accurately compute meanT from temperature
 
          !meanT[meanT==0] = 263.15 # for cells that contains invalid T data
          ! in case there is zero (NAN) temperature data somewhere
 
-         A = A01*np.exp(-Q1/R/meanT)
-         A[meanT<=263.15] = A01*np.exp(-Q1/R/meanT[meanT<=263.15])
-         A[meanT>263.15] = A02*np.exp(-Q2/R/meanT[meanT>263.15])
-         strainRate_e(:) = sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2)
-         visc(:) = 0.5*A**(-1.0/n)*(strainRate_e(:)+eps)**((1.0-n)/n)
+         ! A = A01*np.exp(-Q1/R/meanT)
+         ! A[meanT<=263.15] = A01*np.exp(-Q1/R/meanT[meanT<=263.15])
+         ! A[meanT>263.15] = A02*np.exp(-Q2/R/meanT[meanT>263.15])
+
+         meanFlowParamA(:) = sum(flowParamA(:,:), dim=1)/nVertLevels
+         ! strainRate_e(:) = sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2)
+         visc(:) = 0.5*meanFlowParamA(:)**(-1.0/n)*(sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2))**((1.0-n)/n)
          ! recover effective viscosity from vel. and temp. fields
 
-         sigma_xx_d(:) = 2*visc(:)*exx(:)
-         sigma_yy_d(:) = 2*visc(:)*eyy(:)
-         sigma_xy(:) = 2*visc(:)*(exy(:)+eyx(:))/2.0
-         sigma_yx(:) = 2*visc(:)*(eyx(:)+exy(:))/2.0
+         ! sigma_xx_d(:) = 2*visc(:)*exx(:)
+         ! sigma_yy_d(:) = 2*visc(:)*eyy(:)
+         ! sigma_xy(:) = 2*visc(:)*(exy(:)+eyx(:))/2.0
+         ! sigma_yx(:) = 2*visc(:)*(eyx(:)+exy(:))/2.0
          ! after tests, the real e_xy and e_yx equal (exy+eyx)/2 for the MALI outputs
 
-         sigma_xx(:) = 2*sigma_xx_d(:)+sigma_yy_d(:)
-         sigma_yy(:) = 2*sigma_yy_d(:)+sigma_xx_d(:)
+         sigmaxx(:) = 2*(2*visc(:)*exx(:))+(2*visc(:)*eyy(:))
+         sigmayy(:) = 2*(2*visc(:)*eyy(:))+(2*visc(:)*exx(:))
 
-         sigma_min = (sigma_xx+sigma_yy)/2.0-np.sqrt(((sigma_xx-sigma_yy)/2.0)**2+((sigma_xy+sigma_yx)/2)**2)
-         sigma_max = (sigma_xx+sigma_yy)/2.0+np.sqrt(((sigma_xx-sigma_yy)/2.0)**2+((sigma_xy+sigma_yx)/2)**2)
+         sigmamin = (sigmaxx+sigmayy)/2.0-np.sqrt(((sigmaxx-sigmayy)/2.0)**2+((sigmaxy+sigmayx)/2)**2)
+         sigmamax = (sigmaxx+sigmayy)/2.0+np.sqrt(((sigmaxx-sigmayy)/2.0)**2+((sigmaxy+sigmayx)/2)**2)
 
-         alpha(:) = sigma_min(:) / sigma_max(:)
-         eps_max(:) = sigma_max(:) / (2.0d0*visc(:))
+         alpha(:) = sigmamin(:) / sigmamax(:)
+         epsmax(:) = sigmamax(:) / (2.0d0*visc(:))
 
-         nstar = 12.0d0*(1.0d0+alpha+alpha**2)/(4.0d0*(1.0d0+alpha+alpha**2)+6.0d0*alpha**2) 
+         nstar(:) = 12.0d0*(1.0d0+alpha(:)+alpha(:)**2)/(4.0d0*(1.0d0+alpha(:)+alpha(:)**2)+6.0d0*alpha(:)**2) 
           ! Compute the effective flow law exponent
 
-         szero = rhoi*(rhoo-rhoi)*grav*thickness(:)/(2.0d0*sigma_max(:)*rhoo)
+         szero(:) = rhoi*(rhoo-rhoi)*grav*thickness(:)/(2.0d0*sigma_max(:)*rhoo)
           ! Compute the hydrostatic to tensile stress ratio
 
-         source = nstar * (1.0d0-szero)*eps_max-floatingBasalMassBal/thickness
+         source(:) = nstar(:) * (1.0d0-szero(:))*epsmax(:)-floatingBasalMassBal(:)/thickness(:)
 
-         d_damage_dt(:,i,j) = source(:,i,j) * damage(:,i,j)
+         ddamagedt(:) = source(:) * damage(:)
 
-         calving%damage(:,i,j) = calving%damage(:,i,j) + d_damage_dt(:,i,j) * dt
+         damage(:) = damage(:) + ddamagedt(:) * dt
 
          ! get parameter value
-         if (trim(config_calving_eigencalving_parameter_source) == 'scalar') then
-            eigencalvingParameter = config_calving_eigencalving_parameter_scalar_value
-         elseif (trim(config_calving_eigencalving_parameter_source) == 'data') then
-            ! do nothing - use value from input file
-         else
-            err = 1
-            call mpas_log_write("Invalid value specified for option config_calving_eigencalving_parameter_source" // &
-                  config_calving_eigencalving_parameter_source, MPAS_LOG_ERR)
-         endif
-
-         if (config_print_calving_info) then
-            call mpas_log_write("eigencalvingParameter (m s) value range: Min=$r, Max=$r", &
-                    realArgs=(/minval(eigencalvingParameter), maxval(eigencalvingParameter)/))
-         endif
+!         if (trim(config_calving_eigencalving_parameter_source) == 'scalar') then
+!            eigencalvingParameter = config_calving_eigencalving_parameter_scalar_value
+!         elseif (trim(config_calving_eigencalving_parameter_source) == 'data') then
+!            ! do nothing - use value from input file
+!         else
+!            err = 1
+!            call mpas_log_write("Invalid value specified for option config_calving_eigencalving_parameter_source" // &
+!                  config_calving_eigencalving_parameter_source, MPAS_LOG_ERR)
+!         endif
+!
+!         if (config_print_calving_info) then
+!            call mpas_log_write("eigencalvingParameter (m s) value range: Min=$r, Max=$r", &
+!                    realArgs=(/minval(eigencalvingParameter), maxval(eigencalvingParameter)/))
+!         endif
 
          ! make mask for effective calving front.
          ! This is last dynamic cell, but also make sure it has a neighbor that is open ocean or thin floating ice.
@@ -1266,11 +1323,24 @@ module li_calving
          err = ior(err, err_tmp)
 
          call mpas_deallocate_scratch_field(calvingFrontMaskField, .true.)
+         call mpas_deallocate_scratch_field(meanFlowParamAField, .true.)
+         call mpas_deallocate_scratch_field(viscField, .true.)
+         call mpas_deallocate_scratch_field(sigmaxxField, .true.)
+         call mpas_deallocate_scratch_field(sigmayyField, .true.)
+         call mpas_deallocate_scratch_field(sigmaminField, .true.)
+         call mpas_deallocate_scratch_field(sigmamaxField, .true.)
+         call mpas_deallocate_scratch_field(alphaField, .true.)
+         call mpas_deallocate_scratch_field(epsmaxField, .true.)
+         call mpas_deallocate_scratch_field(nstarField, .true.)
+         call mpas_deallocate_scratch_field(szeroField, .true.)
+         call mpas_deallocate_scratch_field(sourceField, .true.)
+         call mpas_deallocate_scratch_field(ddamagedtField, .true.)
+         ! call mpas_deallocate_scratch_field(damageField, .true.)
 
          block => block % next
       enddo
 
-   end subroutine eigencalving
+   end subroutine damagecalving
 
 
 !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
