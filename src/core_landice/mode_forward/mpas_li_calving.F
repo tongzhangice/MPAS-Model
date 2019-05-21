@@ -188,6 +188,11 @@ module li_calving
          call eigencalving(domain, err_tmp)
          err = ior(err, err_tmp)
 
+      elseif (trim(config_calving) == 'damagecalving') then
+
+         call damagecalving(domain, err_tmp)
+         err = ior(err, err_tmp)
+
       else
 
          call mpas_log_write("Invalid option for config_calving specified: " // trim(config_calving), MPAS_LOG_ERR)

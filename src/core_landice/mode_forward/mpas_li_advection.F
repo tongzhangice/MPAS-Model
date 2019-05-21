@@ -835,12 +835,14 @@ module li_advection
            config_thermal_solver
 
       integer, pointer :: &
-           nCellsSolve                ! number of locally owned cells
+           nCellsSolve,             & ! number of locally owned cells
+           nVertLevels
 
       real (kind=RKIND), dimension(:,:), pointer :: &
            temperature,             & ! interior ice temperature
            waterfrac,               & ! interior water fraction
-           enthalpy                   ! interior ice enthalpy
+           enthalpy,                & ! interior ice enthalpy
+           damage3d
 
       real (kind=RKIND), dimension(:), pointer :: &
            surfaceAirTemperature,   & ! surface air temperature
@@ -850,7 +852,8 @@ module li_advection
            layerCenterSigma           ! sigma coordinate at midpoint of each layer
 
       real (kind=RKIND), dimension(:), pointer :: &
-           thickness                  ! ice thickness
+           thickness,                & ! ice thickness
+           damage
 
       real (kind=RKIND), pointer ::  &
            config_ice_density         ! ice density
@@ -859,12 +862,14 @@ module li_advection
 
       ! get dimensions
       call mpas_pool_get_dimension(meshPool, 'nCellsSolve', nCellsSolve)
+      call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
 
       ! get arrays from mesh pool
       call mpas_pool_get_array(meshPool, 'layerCenterSigma', layerCenterSigma)
 
       ! get arrays from geometry pool
       call mpas_pool_get_array(geometryPool, 'thickness', thickness)
+      call mpas_pool_get_array(geometryPool, 'damage', damage)
 
       ! get arrays from thermal pool
       call mpas_pool_get_array(thermalPool, 'temperature', temperature)
@@ -937,6 +942,26 @@ module li_advection
       ! Note: Other tracers (e.g., ice age or damage) can be added here as needed.
       !       May need to increase maxTracers in the Registry.
 
+      if (trim(config_calving) == 'damagecalving') then  ! advect damage
+
+         ! increment the tracer index
+         iTracer = iTracer + 1
+
+         ! copy 2d damage field into a 3d array for consistency between tracers
+         do k = 1, nVertLevels
+            damage3d(k,:) = damage(:)
+         enddo
+
+         ! copy damage to the tracer array
+         advectedTracers(iTracer,:,:) = damage3d(:,:)
+
+         ! set enthalpy of new ice at upper and lower surfaces
+         ! convert temperature to enthalpy assuming waterfrac = 0 for new ice
+         ! surfaceTracers(iTracer,:) = min(surfaceAirTemperature(:), kelvin_to_celsius) * config_ice_density*cp_ice
+         ! basalTracers(iTracer,:) = basalTemperature(:) * config_ice_density*cp_ice
+
+      endif
+
     end subroutine tracer_setup
 
 !***********************************************************************
@@ -1001,12 +1026,14 @@ module li_advection
            layerCenterSigma           ! sigma coordinate at midpoint of each layer
 
       real (kind=RKIND), dimension(:), pointer :: &
-           thickness                  ! ice thickness
+           thickness,               & ! ice thickness
+           damage
 
       real (kind=RKIND), dimension(:,:), pointer :: &
            temperature,             & ! interior ice temperature
            waterfrac,               & ! water fraction
-           enthalpy                   ! interior ice enthalpy
+           enthalpy,                & ! interior ice enthalpy
+           damage3d
 
       integer :: iCell, iTracer
 
@@ -1018,6 +1045,7 @@ module li_advection
 
       ! get arrays from geometry pool
       call mpas_pool_get_array(geometryPool, 'thickness', thickness)
+      call mpas_pool_get_array(geometryPool, 'damage', damage)
 
       ! get arrays from thermal pool
       call mpas_pool_get_array(thermalPool, 'temperature', temperature)
@@ -1056,6 +1084,16 @@ module li_advection
 
       ! Note: Other tracers (e.g., ice age or damage) can be added here as needed.
       !       May need to increase maxTracers in the Registry.
+
+      iTracer = 2
+
+      if (trim(config_calving) == 'damagecalving') then
+
+         ! update the damage
+         damage3d(:,:) = advectedTracers(iTracer,:,:)
+         damage(:) = damage3d(1,:)
+
+      endif
 
     end subroutine tracer_finish
 
