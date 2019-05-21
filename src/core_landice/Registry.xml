@@ -862,6 +862,9 @@ is the value of that variable from the *previous* time level!
                 <var name="calvingVelocity" type="real" dimensions="nCells Time" units="m s^{-1}" time_levs="1"
 		     description="rate of calving front retreat due to calving, represented as a velocity normal to the calving front (in the x-y plane).  This retreat rate is converted in the code to requiredCalvingVolumeRate."
 		/>
+                <var name="damage" type="real" dimensions="nCells Time" units="m s^{-1}" time_levs="1"
+		     description="damage number"
+		/>
                 <var name="requiredCalvingVolumeRate" type="real" dimensions="nCells Time" units="m^3 s^{-1}" time_levs="1"
 		     description="total volume of ice that needs to be removed based on eigencalving rate at this margin cell"
 		/>
@@ -1088,6 +1091,54 @@ is the value of that variable from the *previous* time level!
 	       persistence="scratch"
 	       />
 	  <var name="workCell3" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="meanFlowParamAField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="viscField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="sigmaxxField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="sigmayyField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="sigmaminField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="sigmamaxField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="alphaField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="epsmaxField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="nstarField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="szeroField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="sourceField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="ddamagedtField" type="real" dimensions="nCells" units="none"
 	       description="generic work array with dimensions of (nCells)"
 	       persistence="scratch"
 	       />
