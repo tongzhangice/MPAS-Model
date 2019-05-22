@@ -1102,6 +1102,14 @@ is the value of that variable from the *previous* time level!
 	       description="generic work array with dimensions of (nCells)"
 	       persistence="scratch"
 	       />
+	  <var name="sigmaxyField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
+	  <var name="sigmayxField" type="real" dimensions="nCells" units="none"
+	       description="generic work array with dimensions of (nCells)"
+	       persistence="scratch"
+	       />
 	  <var name="sigmaxxField" type="real" dimensions="nCells" units="none"
 	       description="generic work array with dimensions of (nCells)"
 	       persistence="scratch"

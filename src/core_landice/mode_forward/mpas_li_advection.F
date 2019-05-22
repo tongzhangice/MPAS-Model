@@ -832,7 +832,8 @@ module li_advection
       !-----------------------------------------------------------------
 
       character (len=StrKIND), pointer :: &
-           config_thermal_solver
+           config_thermal_solver,   &
+           config_calving
 
       integer, pointer :: &
            nCellsSolve,             & ! number of locally owned cells
@@ -858,7 +859,7 @@ module li_advection
       real (kind=RKIND), pointer ::  &
            config_ice_density         ! ice density
 
-      integer :: iCell, iTracer
+      integer :: iCell, iTracer, k
 
       ! get dimensions
       call mpas_pool_get_dimension(meshPool, 'nCellsSolve', nCellsSolve)
@@ -880,6 +881,7 @@ module li_advection
 
       ! get config variables
       call mpas_pool_get_config(liConfigs, 'config_thermal_solver', config_thermal_solver)
+      call mpas_pool_get_config(liConfigs, 'config_calving', config_calving)
       call mpas_pool_get_config(liConfigs, 'config_ice_density', config_ice_density)
 
       ! initialize
@@ -1017,7 +1019,8 @@ module li_advection
       !-----------------------------------------------------------------
 
       character (len=StrKIND), pointer :: &
-           config_thermal_solver
+           config_thermal_solver,   &
+           config_calving
 
       integer, pointer :: &
            nCellsSolve                ! number of locally owned cells
@@ -1054,6 +1057,7 @@ module li_advection
 
       ! get config variables
       call mpas_pool_get_config(liConfigs, 'config_thermal_solver', config_thermal_solver)
+      call mpas_pool_get_config(liConfigs, 'config_calving', config_calving)
 
       iTracer = 1
 

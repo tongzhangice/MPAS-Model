@@ -46,7 +46,7 @@ module li_calving
    !
    !--------------------------------------------------------------------
 
-   public :: li_calve_ice, li_restore_calving_front
+   public :: li_calve_ice, li_restore_calving_front, calculate_damage
 
    !--------------------------------------------------------------------
    !
@@ -1080,6 +1080,7 @@ module li_calving
 !> \details Calve using damage model
 !> Bassis, Jeremy N., and Y. Ma. "Evolution of basal crevasses links ice shelf stability to ocean forcing." 
 !> Earth and Planetary Science Letters 409 (2015): 203-211.
+! TODO need to connect damage tracer to calving flux
 
 !-----------------------------------------------------------------------
    subroutine damagecalving(domain, err)
@@ -1118,6 +1119,7 @@ module li_calving
       real (kind=RKIND), dimension(:), pointer :: requiredCalvingVolumeRate
       real (kind=RKIND), dimension(:), pointer :: calvingVelocity
       real (kind=RKIND), dimension(:), pointer :: eMax, eMin
+      real (kind=RKIND), dimension(:), pointer :: damage
       integer, dimension(:), pointer :: cellMask
       type (field1dInteger), pointer :: calvingFrontMaskField
       integer, dimension(:), pointer :: calvingFrontMask
@@ -1164,119 +1166,6 @@ module li_calving
          call mpas_pool_get_array(geometryPool, 'requiredCalvingVolumeRate', requiredCalvingVolumeRate)
          call mpas_pool_get_array(geometryPool, 'damage', damage)
 
-         call mpas_pool_get_array(geometryPool, 'calvingVelocity', calvingVelocity)
-         call mpas_pool_get_array(velocityPool, 'eMax', eMax)
-         call mpas_pool_get_array(velocityPool, 'eMin', eMin)
-         call mpas_pool_get_array(velocityPool, 'exx', exx)
-         call mpas_pool_get_array(velocityPool, 'exy', exy)
-         call mpas_pool_get_array(velocityPool, 'eyx', eyx)
-         call mpas_pool_get_array(velocityPool, 'eyy', eyy)
-         call mpas_pool_get_array(velocityPool, 'flowParamA', flowParamA)
-
-         call mpas_pool_get_array(thermalPool, 'temperature', temperature)
-         call mpas_pool_get_array(thermalPool, 'surfaceTemperature', surfaceTemperature)
-         call mpas_pool_get_array(thermalPool, 'basalTemperature', basalTemperature)
-
-         call mpas_pool_get_array(geometryPool, 'floatingBasalMassBal', floatingBasalMassBal)
-
-         call mpas_pool_get_field(scratchPool, 'iceCellMask2',  calvingFrontMaskField)
-         call mpas_allocate_scratch_field(calvingFrontMaskField, .true.)
-         calvingFrontMask => calvingFrontMaskField % array
-
-         call mpas_pool_get_field(scratchPool, 'meanFlowParamAField',  meanFlowParamAField)
-         call mpas_allocate_scratch_field(meanFlowParamAField, .true.)
-         meanFlowParamA => meanFlowParamAField % array
-
-         call mpas_pool_get_field(scratchPool, 'viscField',  viscField)
-         call mpas_allocate_scratch_field(viscField, .true.)
-         visc => viscField % array
-
-         call mpas_pool_get_field(scratchPool, 'sigmaxxField', sigmaxxField )
-         call mpas_allocate_scratch_field(sigmaxxField, .true.)
-         sigmaxx => sigmaxxField % array
-
-         call mpas_pool_get_field(scratchPool, 'sigmayyField', sigmayyField )
-         call mpas_allocate_scratch_field(sigmayyField, .true.)
-         sigmayy => sigmayyField % array
-
-         call mpas_pool_get_field(scratchPool, 'sigmaminField', sigmaminField )
-         call mpas_allocate_scratch_field(sigmaminField, .true.)
-         sigmamin => sigmaminField % array
-
-         call mpas_pool_get_field(scratchPool, 'sigmamaxField', sigmamaxField )
-         call mpas_allocate_scratch_field(sigmamaxField, .true.)
-         sigmamax => sigmamaxField % array
-
-         call mpas_pool_get_field(scratchPool, 'alphaField', alphaField )
-         call mpas_allocate_scratch_field(alphaField, .true.)
-         alpha => alphaField % array
-
-         call mpas_pool_get_field(scratchPool, 'epsmaxField', epsmaxField )
-         call mpas_allocate_scratch_field(epsmaxField, .true.)
-         epsmax => epsmaxField % array
-
-         call mpas_pool_get_field(scratchPool, 'nstarField', nstarField )
-         call mpas_allocate_scratch_field(nstarField, .true.)
-         nstar => nstarField % array
-
-         call mpas_pool_get_field(scratchPool, 'szeroField', szeroField )
-         call mpas_allocate_scratch_field(szeroField, .true.)
-         szero => szeroField % array
-
-         call mpas_pool_get_field(scratchPool, 'sourceField', sourceField )
-         call mpas_allocate_scratch_field(sourceField, .true.)
-         source => sourceField % array
-
-         call mpas_pool_get_field(scratchPool, 'ddamagedtField', ddamagedtField )
-         call mpas_allocate_scratch_field(ddamagedtField, .true.)
-         ddamagedt => ddamagedtField % array
-
-         ! call mpas_pool_get_field(scratchPool, 'damageField', damageField )
-         ! call mpas_allocate_scratch_field(damageField, .true.)
-         ! damage => damageField % array
-
-         ! meanT(:) = (surfaceTemperature(:)+basalTemperature(:))/2.0d0
-         ! use this simple math to estimate the mean T, temporarily 
-         ! TODO: accurately compute meanT from temperature
-
-         !meanT[meanT==0] = 263.15 # for cells that contains invalid T data
-         ! in case there is zero (NAN) temperature data somewhere
-
-         ! A = A01*np.exp(-Q1/R/meanT)
-         ! A[meanT<=263.15] = A01*np.exp(-Q1/R/meanT[meanT<=263.15])
-         ! A[meanT>263.15] = A02*np.exp(-Q2/R/meanT[meanT>263.15])
-
-         meanFlowParamA(:) = sum(flowParamA(:,:), dim=1)/nVertLevels
-         ! strainRate_e(:) = sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2)
-         visc(:) = 0.5*meanFlowParamA(:)**(-1.0/n)*(sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2))**((1.0-n)/n)
-         ! recover effective viscosity from vel. and temp. fields
-
-         ! sigma_xx_d(:) = 2*visc(:)*exx(:)
-         ! sigma_yy_d(:) = 2*visc(:)*eyy(:)
-         ! sigma_xy(:) = 2*visc(:)*(exy(:)+eyx(:))/2.0
-         ! sigma_yx(:) = 2*visc(:)*(eyx(:)+exy(:))/2.0
-         ! after tests, the real e_xy and e_yx equal (exy+eyx)/2 for the MALI outputs
-
-         sigmaxx(:) = 2*(2*visc(:)*exx(:))+(2*visc(:)*eyy(:))
-         sigmayy(:) = 2*(2*visc(:)*eyy(:))+(2*visc(:)*exx(:))
-
-         sigmamin = (sigmaxx+sigmayy)/2.0-np.sqrt(((sigmaxx-sigmayy)/2.0)**2+((sigmaxy+sigmayx)/2)**2)
-         sigmamax = (sigmaxx+sigmayy)/2.0+np.sqrt(((sigmaxx-sigmayy)/2.0)**2+((sigmaxy+sigmayx)/2)**2)
-
-         alpha(:) = sigmamin(:) / sigmamax(:)
-         epsmax(:) = sigmamax(:) / (2.0d0*visc(:))
-
-         nstar(:) = 12.0d0*(1.0d0+alpha(:)+alpha(:)**2)/(4.0d0*(1.0d0+alpha(:)+alpha(:)**2)+6.0d0*alpha(:)**2) 
-          ! Compute the effective flow law exponent
-
-         szero(:) = rhoi*(rhoo-rhoi)*grav*thickness(:)/(2.0d0*sigma_max(:)*rhoo)
-          ! Compute the hydrostatic to tensile stress ratio
-
-         source(:) = nstar(:) * (1.0d0-szero(:))*epsmax(:)-floatingBasalMassBal(:)/thickness(:)
-
-         ddamagedt(:) = source(:) * damage(:)
-
-         damage(:) = damage(:) + ddamagedt(:) * dt
 
          ! get parameter value
 !         if (trim(config_calving_eigencalving_parameter_source) == 'scalar') then
@@ -1327,6 +1216,298 @@ module li_calving
          call distribute_calving_flux(meshPool, geometryPool, scratchPool, calvingFrontMask, err_tmp)
          err = ior(err, err_tmp)
 
+
+         block => block % next
+      enddo
+
+   end subroutine damagecalving
+
+
+!|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+!
+!    routine calculate_damage
+!
+!> \author Tong Zhang
+!> \date   May. 2019
+!> \details calulate the damage tracer 
+!> Bassis, Jeremy N., and Y. Ma. "Evolution of basal crevasses links ice shelf stability to ocean forcing." 
+!> Earth and Planetary Science Letters 409 (2015): 203-211.
+
+!-----------------------------------------------------------------------
+
+   subroutine calculate_damage(domain, err)
+
+      !-----------------------------------------------------------------
+      ! input variables
+      !-----------------------------------------------------------------
+
+      !-----------------------------------------------------------------
+      ! input/output variables
+      !-----------------------------------------------------------------
+      type (domain_type), intent(inout) :: &
+         domain          !< Input/Output: domain object
+
+      !-----------------------------------------------------------------
+      ! output variables
+      !-----------------------------------------------------------------
+      integer, intent(out) :: err !< Output: error flag
+
+      !-----------------------------------------------------------------
+      ! local variables
+      !-----------------------------------------------------------------
+      type (block_type), pointer :: block
+      type (mpas_pool_type), pointer :: geometryPool
+      type (mpas_pool_type), pointer :: meshPool
+      type (mpas_pool_type), pointer :: velocityPool
+      type (mpas_pool_type), pointer :: scratchPool
+      real(kind=RKIND), pointer :: config_calving_eigencalving_parameter_scalar_value
+      character (len=StrKIND), pointer :: config_calving_eigencalving_parameter_source
+      logical, pointer :: config_print_calving_info
+      real (kind=RKIND), pointer :: config_sea_level
+      real (kind=RKIND), dimension(:), pointer :: thickness
+      real (kind=RKIND), dimension(:), pointer :: bedTopography
+      real (kind=RKIND), dimension(:), pointer :: eigencalvingParameter
+      real (kind=RKIND), dimension(:), pointer :: calvingThickness
+      real (kind=RKIND), dimension(:), pointer :: requiredCalvingVolumeRate
+      real (kind=RKIND), dimension(:), pointer :: calvingVelocity
+      real (kind=RKIND), dimension(:), pointer :: eMax, eMin, exx, exy, eyx, eyy
+      real (kind=RKIND), dimension(:,:), pointer :: flowParamA
+      real (kind=RKIND), dimension(:), pointer :: floatingBasalMassBal
+      real (kind=RKIND), dimension(:), pointer :: damage
+      real (kind=RKIND), pointer ::  &
+           config_ice_density,            & ! ice density
+           config_ocean_density             ! ocean density
+
+      real (kind=RKIND), save :: rhoi    ! ice density (kg m^{-3}), copied from config_ice_density
+      real (kind=RKIND), save :: rhoo    ! ocean density (kg m^{-3}), copied from config_ocean_density
+
+      type (field1dReal), pointer :: meanFlowParamAField
+      real, dimension(:), pointer :: meanFlowParamA
+      type (field1dReal), pointer :: viscField
+      real, dimension(:), pointer :: visc
+      type (field1dReal), pointer :: sigmayxField
+      real, dimension(:), pointer :: sigmayx
+      type (field1dReal), pointer :: sigmaxyField
+      real, dimension(:), pointer :: sigmaxy
+      type (field1dReal), pointer :: sigmaxxField
+      real, dimension(:), pointer :: sigmaxx
+      type (field1dReal), pointer :: sigmayyField
+      real, dimension(:), pointer :: sigmayy
+      type (field1dReal), pointer :: sigmaminField
+      real, dimension(:), pointer :: sigmamin
+      type (field1dReal), pointer :: sigmamaxField
+      real, dimension(:), pointer :: sigmamax
+      type (field1dReal), pointer :: alphaField
+      real, dimension(:), pointer :: alpha
+      type (field1dReal), pointer :: epsmaxField
+      real, dimension(:), pointer :: epsmax
+      type (field1dReal), pointer :: nstarField
+      real, dimension(:), pointer :: nstar
+      type (field1dReal), pointer :: szeroField
+      real, dimension(:), pointer :: szero
+      type (field1dReal), pointer :: sourceField
+      real, dimension(:), pointer :: source
+      type (field1dReal), pointer :: ddamagedtField
+      real, dimension(:), pointer :: ddamagedt
+
+      integer, dimension(:), pointer :: cellMask
+      type (field1dInteger), pointer :: calvingFrontMaskField
+      integer, dimension(:), pointer :: calvingFrontMask
+      real (kind=RKIND), pointer :: deltat  !< time step (s)
+      integer, dimension(:), pointer :: nEdgesOnCell ! number of cells that border each cell
+      integer, dimension(:,:), pointer :: cellsOnCell ! list of cells that neighbor each cell
+      integer, dimension(:,:), pointer :: edgesOnCell
+      real (kind=RKIND), dimension(:), pointer :: dvEdge
+      integer, pointer :: nCells, nVertLevels
+      integer :: iCell, jCell, iNeighbor
+      real(kind=RKIND) :: cellCalvingFrontLength, cellCalvingFrontHeight
+      integer :: err_tmp
+
+      err = 0
+
+      call mpas_pool_get_config(liConfigs, 'config_print_calving_info', config_print_calving_info)
+      call mpas_pool_get_config(liConfigs, 'config_calving_eigencalving_parameter_scalar_value', &
+               config_calving_eigencalving_parameter_scalar_value)
+      call mpas_pool_get_config(liConfigs, 'config_calving_eigencalving_parameter_source', config_calving_eigencalving_parameter_source)
+      call mpas_pool_get_config(liConfigs, 'config_sea_level', config_sea_level)
+
+      ! block loop
+      block => domain % blocklist
+      do while (associated(block))
+
+         ! get pools
+         call mpas_pool_get_subpool(block % structs, 'geometry', geometryPool)
+         call mpas_pool_get_subpool(block % structs, 'velocity', velocityPool)
+         call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
+         call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
+
+         ! get fields
+         call mpas_pool_get_dimension(meshPool, 'nCells', nCells)
+         call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
+
+         call mpas_pool_get_array(meshPool, 'deltat', deltat)
+         call mpas_pool_get_array(meshPool, 'nEdgesOnCell', nEdgesOnCell)
+         call mpas_pool_get_array(meshPool, 'edgesOnCell', edgesOnCell)
+         call mpas_pool_get_array(meshPool, 'cellsOnCell', cellsOnCell)
+         call mpas_pool_get_array(meshPool, 'dvEdge', dvEdge)
+         call mpas_pool_get_array(geometryPool, 'calvingThickness', calvingThickness)
+         call mpas_pool_get_array(geometryPool, 'cellMask', cellMask)
+         call mpas_pool_get_array(geometryPool, 'thickness', thickness)
+         call mpas_pool_get_array(geometryPool, 'bedTopography', bedTopography)
+         call mpas_pool_get_array(geometryPool, 'eigencalvingParameter', eigencalvingParameter)
+         call mpas_pool_get_array(geometryPool, 'requiredCalvingVolumeRate', requiredCalvingVolumeRate)
+         call mpas_pool_get_array(geometryPool, 'damage', damage)
+
+         call mpas_pool_get_array(geometryPool, 'calvingVelocity', calvingVelocity)
+         call mpas_pool_get_array(velocityPool, 'eMax', eMax)
+         call mpas_pool_get_array(velocityPool, 'eMin', eMin)
+         call mpas_pool_get_array(velocityPool, 'exx', exx)
+         call mpas_pool_get_array(velocityPool, 'exy', exy)
+         call mpas_pool_get_array(velocityPool, 'eyx', eyx)
+         call mpas_pool_get_array(velocityPool, 'eyy', eyy)
+         call mpas_pool_get_array(velocityPool, 'flowParamA', flowParamA)
+
+         !call mpas_pool_get_array(thermalPool, 'temperature', temperature)
+         !call mpas_pool_get_array(thermalPool, 'surfaceTemperature', surfaceTemperature)
+         !call mpas_pool_get_array(thermalPool, 'basalTemperature', basalTemperature)
+
+         call mpas_pool_get_array(geometryPool, 'floatingBasalMassBal', floatingBasalMassBal)
+
+         call mpas_pool_get_field(scratchPool, 'iceCellMask2',  calvingFrontMaskField)
+         call mpas_allocate_scratch_field(calvingFrontMaskField, .true.)
+         calvingFrontMask => calvingFrontMaskField % array
+
+         call mpas_pool_get_field(scratchPool, 'meanFlowParamAField',  meanFlowParamAField)
+         call mpas_allocate_scratch_field(meanFlowParamAField, .true.)
+         meanFlowParamA => meanFlowParamAField % array
+
+         call mpas_pool_get_field(scratchPool, 'viscField',  viscField)
+         call mpas_allocate_scratch_field(viscField, .true.)
+         visc => viscField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmaxyField', sigmaxyField )
+         call mpas_allocate_scratch_field(sigmaxyField, .true.)
+         sigmaxy => sigmaxyField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmayxField', sigmayxField )
+         call mpas_allocate_scratch_field(sigmayxField, .true.)
+         sigmayx => sigmayxField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmaxxField', sigmaxxField )
+         call mpas_allocate_scratch_field(sigmaxxField, .true.)
+         sigmaxx => sigmaxxField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmayyField', sigmayyField )
+         call mpas_allocate_scratch_field(sigmayyField, .true.)
+         sigmayy => sigmayyField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmaminField', sigmaminField )
+         call mpas_allocate_scratch_field(sigmaminField, .true.)
+         sigmamin => sigmaminField % array
+
+         call mpas_pool_get_field(scratchPool, 'sigmamaxField', sigmamaxField )
+         call mpas_allocate_scratch_field(sigmamaxField, .true.)
+         sigmamax => sigmamaxField % array
+
+         call mpas_pool_get_field(scratchPool, 'alphaField', alphaField )
+         call mpas_allocate_scratch_field(alphaField, .true.)
+         alpha => alphaField % array
+
+         call mpas_pool_get_field(scratchPool, 'epsmaxField', epsmaxField )
+         call mpas_allocate_scratch_field(epsmaxField, .true.)
+         epsmax => epsmaxField % array
+
+         call mpas_pool_get_field(scratchPool, 'nstarField', nstarField )
+         call mpas_allocate_scratch_field(nstarField, .true.)
+         nstar => nstarField % array
+
+         call mpas_pool_get_field(scratchPool, 'szeroField', szeroField )
+         call mpas_allocate_scratch_field(szeroField, .true.)
+         szero => szeroField % array
+
+         call mpas_pool_get_field(scratchPool, 'sourceField', sourceField )
+         call mpas_allocate_scratch_field(sourceField, .true.)
+         source => sourceField % array
+
+         call mpas_pool_get_field(scratchPool, 'ddamagedtField', ddamagedtField )
+         call mpas_allocate_scratch_field(ddamagedtField, .true.)
+         ddamagedt => ddamagedtField % array
+
+         call mpas_pool_get_config(liConfigs, 'config_ice_density', config_ice_density)
+         call mpas_pool_get_config(liConfigs, 'config_ocean_density', config_ocean_density)
+         rhoi = config_ice_density
+         rhoo = config_ocean_density
+
+         ! call mpas_pool_get_field(scratchPool, 'damageField', damageField )
+         ! call mpas_allocate_scratch_field(damageField, .true.)
+         ! damage => damageField % array
+
+         ! meanT(:) = (surfaceTemperature(:)+basalTemperature(:))/2.0d0
+         ! use this simple math to estimate the mean T, temporarily 
+         ! TODO: accurately compute meanT from temperature
+
+         !meanT[meanT==0] = 263.15 # for cells that contains invalid T data
+         ! in case there is zero (NAN) temperature data somewhere
+
+         ! A = A01*np.exp(-Q1/R/meanT)
+         ! A[meanT<=263.15] = A01*np.exp(-Q1/R/meanT[meanT<=263.15])
+         ! A[meanT>263.15] = A02*np.exp(-Q2/R/meanT[meanT>263.15])
+
+         meanFlowParamA(:) = sum(flowParamA(:,:), dim=1)/nVertLevels
+         ! strainRate_e(:) = sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2)
+         visc(:) = 0.5*meanFlowParamA(:)**(-1.0/3.0)*(sqrt(0.5*(exx(:)**2+eyy(:)**2) + 0.25*(exy(:)+eyx(:))**2))**((1.0-3.0)/3.0)
+         ! recover effective viscosity from vel. and temp. fields
+
+         ! sigma_xx_d(:) = 2*visc(:)*exx(:)
+         ! sigma_yy_d(:) = 2*visc(:)*eyy(:)
+         ! sigma_xy(:) = 2*visc(:)*(exy(:)+eyx(:))/2.0
+         ! sigma_yx(:) = 2*visc(:)*(eyx(:)+exy(:))/2.0
+         ! after tests, the real e_xy and e_yx equal (exy+eyx)/2 for the MALI outputs
+
+         sigmaxy(:) = 2*visc(:)*(exy(:)+eyx(:))/2.0
+         sigmayx(:) = 2*visc(:)*(eyx(:)+exy(:))/2.0
+
+         sigmaxx(:) = 2*(2*visc(:)*exx(:))+(2*visc(:)*eyy(:))
+         sigmayy(:) = 2*(2*visc(:)*eyy(:))+(2*visc(:)*exx(:))
+
+         sigmamin(:) = (sigmaxx(:)+sigmayy(:))/2.0-sqrt(((sigmaxx(:)-sigmayy(:))/2.0)**2+((sigmaxy(:)+sigmayx(:))/2)**2)
+         sigmamax(:) = (sigmaxx(:)+sigmayy(:))/2.0+sqrt(((sigmaxx(:)-sigmayy(:))/2.0)**2+((sigmaxy(:)+sigmayx(:))/2)**2)
+
+         alpha(:) = sigmamin(:) / sigmamax(:)
+         epsmax(:) = sigmamax(:) / (2.0d0*visc(:))
+
+         nstar(:) = 12.0d0*(1.0d0+alpha(:)+alpha(:)**2)/(4.0d0*(1.0d0+alpha(:)+alpha(:)**2)+6.0d0*alpha(:)**2) 
+          ! Compute the effective flow law exponent
+
+         szero(:) = rhoi*(rhoo-rhoi)*gravity*thickness(:)/(2.0d0*sigmamax(:)*rhoo)
+          ! Compute the hydrostatic to tensile stress ratio
+
+         source(:) = nstar(:) * (1.0d0-szero(:))*epsmax(:)-floatingBasalMassBal(:)/thickness(:)
+
+         ddamagedt(:) = source(:) * damage(:)
+
+         damage(:) = damage(:) + ddamagedt(:) * deltat
+
+         ! get parameter value
+!         if (trim(config_calving_eigencalving_parameter_source) == 'scalar') then
+!            eigencalvingParameter = config_calving_eigencalving_parameter_scalar_value
+!         elseif (trim(config_calving_eigencalving_parameter_source) == 'data') then
+!            ! do nothing - use value from input file
+!         else
+!            err = 1
+!            call mpas_log_write("Invalid value specified for option config_calving_eigencalving_parameter_source" // &
+!                  config_calving_eigencalving_parameter_source, MPAS_LOG_ERR)
+!         endif
+!
+!         if (config_print_calving_info) then
+!            call mpas_log_write("eigencalvingParameter (m s) value range: Min=$r, Max=$r", &
+!                    realArgs=(/minval(eigencalvingParameter), maxval(eigencalvingParameter)/))
+!         endif
+
+         ! make mask for effective calving front.
+         ! This is last dynamic cell, but also make sure it has a neighbor that is open ocean or thin floating ice.
+
+
          call mpas_deallocate_scratch_field(calvingFrontMaskField, .true.)
          call mpas_deallocate_scratch_field(meanFlowParamAField, .true.)
          call mpas_deallocate_scratch_field(viscField, .true.)
@@ -1343,9 +1524,10 @@ module li_calving
          ! call mpas_deallocate_scratch_field(damageField, .true.)
 
          block => block % next
+             
       enddo
 
-   end subroutine damagecalving
+   end subroutine calculate_damage 
 
 
 !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||

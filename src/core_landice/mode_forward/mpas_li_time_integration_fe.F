@@ -29,7 +29,7 @@ module li_time_integration_fe
    use mpas_log
 
    use li_advection
-   use li_calving, only: li_calve_ice, li_restore_calving_front
+   use li_calving, only: li_calve_ice, li_restore_calving_front, calculate_damage
    use li_thermal, only: li_thermal_solver, li_basal_melt_floating_ice
    use li_diagnostic_vars
    use li_setup
@@ -126,6 +126,12 @@ module li_time_integration_fe
       call li_thermal_solver(domain, err_tmp)
       err = ior(err, err_tmp)
       call mpas_timer_stop("vertical therm")
+
+! === calculate damage ===========
+      call mpas_timer_start("damage")
+      call calculate_damage(domain, err_tmp)
+      err = ior(err, err_tmp)
+      call mpas_timer_stop("damage")
 
 ! === Compute new state for prognostic variables ==================================
       call mpas_timer_start("advect thickness and tracers")
