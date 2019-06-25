@@ -9,7 +9,7 @@
 # mode template, which typically would point to the namelist.landice generated in
 # default_inputs after a successful build of the model.
 [namelists]
-forward = /home/tzhang/Apps/MPAS-Model/default_inputs/namelist.landice
+forward = /global/homes/t/tongz/apps/MPAS-Model-tong/default_inputs/namelist.landice
 
 
 # The streams section describes required streams file templates that are used to
@@ -17,20 +17,19 @@ forward = /home/tzhang/Apps/MPAS-Model/default_inputs/namelist.landice
 # mode template, which generally points to the streams.landice generated in
 # default_inputs after a successful build of the model.
 [streams]
-forward = /home/tzhang/Apps/MPAS-Model/default_inputs/streams.landice
+forward = /global/homes/t/tongz/apps/MPAS-Model-tong/default_inputs/streams.landice
 
 # The executables section defines paths to required executables. These
 # executables are provided for use by specific test cases.
 # Full paths should be provided in order to access the executables from
 # anywhere on the machine.
 [executables]
-#model = /home/tzhang/Apps/MPAS-Model/landice_model
-model = /home/tzhang/Documents/projects/enthalpy_benchmark/A/enthalpy_benchmark_stage1/landice_model
-grid_to_li_grid = /home/tzhang/Apps/MPAS-Tools/grid_gen/landice_grid_tools/create_landice_grid_from_generic_MPAS_grid.py
-define_cull_mask = /home/tzhang/Apps/MPAS-Tools/landice/mesh_tools_li/define_cullMask.py
-interpolate_to_mpasli_grid = /home/tzhang/Apps/MPAS-Tools/landice/mesh_tools_li/interpolate_to_mpasli_grid.py
-periodic_grid = /home/tzhang/Apps/MPAS-Tools/grid_gen/periodic_hex/periodic_grid
-mesh_converter = /home/tzhang/Apps/MPAS-Tools/grid_gen/mesh_conversion_tools/MpasMeshConverter.x
+model = /global/homes/t/tongz/apps/MPAS-Model-tong/landice_model_enthalpy_A
+grid_to_li_grid = /global/homes/t/tongz/apps/MPAS-Tools/grid_gen/landice_grid_tools/create_landice_grid_from_generic_MPAS_grid.py
+define_cull_mask = /global/homes/t/tongz/apps/MPAS-Tools/landice/mesh_tools_li/define_cullMask.py
+interpolate_to_mpasli_grid = /global/homes/t/tongz/apps/MPAS-Tools/landice/mesh_tools_li/interpolate_to_mpasli_grid.py
+periodic_grid = /global/homes/t/tongz/apps/MPAS-Tools/grid_gen/periodic_hex/periodic_grid
+mesh_converter = /global/homes/t/tongz/apps/MPAS-Tools/grid_gen/mesh_conversion_tools/MpasMeshConverter.x
 
 
 # The paths section describes paths that are used within the landice core test

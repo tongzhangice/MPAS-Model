@@ -7,7 +7,7 @@
         <add_executable source="mesh_converter" dest="MpasMeshConverter.x"/>
         <!--add_link source="make_graph_file.py" source_path="utility_scripts" dest="make_graph_file.py"/-->
         <add_link source_path="script_configuration_dir" source="setup_initial_conditions_B.py" dest="."/>
-        <add_link source_path="script_configuration_dir" source="namelist.input" dest="."/>
+        <add_link source_path="script_configuration_dir" source="mesh.namelist.input" dest="namelist.input"/>
 
         <run_script name="setup_mesh.py">
 
