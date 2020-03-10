@@ -181,6 +181,14 @@
                         description="If true, then we use constant A (i.e., config_default_flowParamA) in the damage calculation."
 	                possible_values=".true. or .false."
 		/>
+                <nml_option name="config_damage_if_calving_rate" type="logical" default_value=".false." units="unitless"
+                        description="If true, then we use a parameterized calving velocity to connect calving and damage."
+	                possible_values=".true. or .false."
+		/>
+    <nml_option name="config_damagecalvingParameter" type="real" default_value="1.0e-4" units="m/s"
+                        description="A scalar parameter that links damage and calving"
+	                possible_values="any positive real value"
+		/>
 	</nml_record>
 
 	<nml_record name="thermal_solver" in_defaults="true">
