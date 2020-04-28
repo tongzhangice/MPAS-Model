@@ -1426,6 +1426,7 @@ module li_calving
          call mpas_pool_get_array(geometryPool, 'thickness', thickness)
          call mpas_pool_get_array(geometryPool, 'bedTopography', bedTopography)
          call mpas_pool_get_array(geometryPool, 'damage', damage)
+         call mpas_pool_get_array(geometryPool, 'calvingVelocity', calvingVelocity)
 
          call mpas_pool_get_field(scratchPool, 'iceCellMask2',  calvingFrontMaskField)
          call mpas_allocate_scratch_field(calvingFrontMaskField, .true.)
@@ -1440,60 +1441,6 @@ module li_calving
                   ! calculate only for floating ice - map of "potential" calving rate
 
          call remove_calving_ice(meshPool, geometryPool, velocityPool, scratchPool, err)
-
-         !call remove_damaged_ice(meshPool, geometryPool, scratchPool, calvingFrontMask, err_tmp)
-
-         !err = ior(err, err_tmp)
-
-         ! === apply calving ===
-         !thickness(:) = thickness(:) - calvingThickness(:)
-
-         ! update mask
-         !call li_calculate_mask(meshPool, velocityPool, geometryPool, err_tmp)
-         !err = ior(err, err_tmp)
-         !call calculate_calving_front_mask(meshPool, geometryPool, calvingFrontMask)
-
-
-         ! Now also remove thin floating, dynamic ice (based on chosen thickness threshold) after mask is updated.
-
-         !where ((li_mask_is_floating_ice(cellMask) .and. li_mask_is_dynamic_ice(cellMask) .and. &
-         ! thickness<config_calving_thickness))
-         ! The above commented version removed thin ice anywhere on the shelf.  In theory this seemed preferable,
-         ! but in practice it has the tendency to create 'holes' in relatively stagnant areas of ice shelves along
-         ! the grounding line.  Once these holes developed they would grow and eventually collapse the shelf from behind.
-
-         ! This criteria below only remove too-thin ice at the new calving front,
-         ! meaning just one 'row' of cells per timestep.  This could be expanded to continue
-         ! removing ice backward until all connected too-thin ice has been removed.
-         ! Tests of the current implementation show reasonable behavior.
-         !where (calvingFrontMask == 1 .and. thickness<config_calving_thickness)
-         !    calvingThickness = calvingThickness + thickness
-         !    thickness = 0.0_RKIND
-         !end where
-
-         ! update mask
-         !call li_calculate_mask(meshPool, velocityPool, geometryPool, err_tmp)
-         !err = ior(err, err_tmp)
-
-         ! remove abandoned floating ice (i.e. icebergs) and add it to the calving flux
-         ! Defined as: floating ice (dynamic or non-dynamic) that is not adjacent to dynamic ice (floating or grounded)
-         ! This won't necessarily find all abandoned ice, but in practice it does a pretty good job at general cleanup
-         !do iCell = 1, nCells
-         !   if (li_mask_is_floating_ice(cellMask(iCell))) then
-               ! check neighbors for dynamic ice (floating or grounded)
-         !      dynamicNeighbor = .false.
-         !      do iNeighbor = 1, nEdgesOnCell(iCell)
-         !         jCell = cellsOnCell(iNeighbor, iCell)
-         !         if (li_mask_is_dynamic_ice(cellMask(jCell))) dynamicNeighbor = .true.
-         !      enddo
-         !      if (.not. dynamicNeighbor) then  ! calve this ice
-         !         calvingThickness(iCell) = calvingThickness(iCell) + thickness(iCell)
-         !         thickness(iCell) = 0.0_RKIND
-         !      endif
-         !   endif
-         !enddo
-
-         !call mpas_deallocate_scratch_field(calvingFrontMaskField, .true.)
 
          block => block % next
 
@@ -2289,6 +2236,9 @@ module li_calving
       call mpas_pool_get_field(scratchPool, 'workCell',  cellVolumeField)
       call mpas_allocate_scratch_field(cellVolumeField, .true.)
       cellVolume => cellVolumeField % array
+
+     call mpas_log_write("thickness range1: Min=$r, Max=$r", &
+                realArgs=(/minval(thickness), maxval(thickness)/))
 
       calvingThickness(:) = 0.0_RKIND
       uncalvedVolume(:) = 0.0_RKIND
