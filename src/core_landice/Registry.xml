@@ -573,6 +573,7 @@
 			<var name="thickness"/>
 			<var name="basalWaterThickness"/>
 			<var name="bedTopography"/>
+			<var name="tmpVar"/>
 			<var name="temperature"/>
 			<var name="waterFrac"/>
 			<var name="sfcMassBal"/>
@@ -659,6 +660,7 @@
                         <var name="heatDissipation" packages="thermal"/>
 			<var name="cellMask"/>
 			<var name="bedTopography"/>
+			<var name="tmpVar"/>
 			<var name="sfcMassBal"/>
                         <var name="floatingBasalMassBal"/>
                         <var name="eigencalvingParameter"/>
@@ -724,6 +726,8 @@
 			<var name="upperSurface"/>
 			<var name="temperature"/>
 			<var name="cellMask"/>
+			<var name="cellMaskFront"/>
+			<var name="cellVolumeLeft"/>
 			<var name="edgeMask"/>
 			<var name="normalVelocity"/>
 			<var name="uReconstructX"/>
@@ -953,6 +957,9 @@ is the value of that variable from the *previous* time level!
                 <var name="bedTopography" type="real" dimensions="nCells Time" units="m above datum"
                      description="Elevation of ice sheet bed.  Once isostasy is added to the model, this should become a state variable."
                 />
+                <var name="tmpVar" type="real" dimensions="nCells Time" units="m above datum"
+                     description="Elevation of ice sheet bed.  Once isostasy is added to the model, this should become a state variable."
+                />
                 <var name="thickness" type="real" dimensions="nCells Time" units="m" time_levs="1"
                      description="ice thickness"
                 />
@@ -978,6 +985,12 @@ is the value of that variable from the *previous* time level!
                      description="diagnostic field of dynamic thickening rate (calculated as negative of flux divergence)"
                 />
                 <var name="cellMask" type="integer" dimensions="nCells Time" units="none"
+                     description="bitmask indicating various properties about the ice sheet on cells.  cellMask only needs to be a restart field if config_allow_additional_advance = false (to keep the mask of initial ice extent)"
+                />
+                <var name="cellMaskFront" type="integer" dimensions="nCells Time" units="none"
+                     description="bitmask indicating various properties about the ice sheet on cells.  cellMask only needs to be a restart field if config_allow_additional_advance = false (to keep the mask of initial ice extent)"
+                />
+                <var name="cellVolumeLeft" type="real" dimensions="nCells Time" units="none"
                      description="bitmask indicating various properties about the ice sheet on cells.  cellMask only needs to be a restart field if config_allow_additional_advance = false (to keep the mask of initial ice extent)"
                 />
                 <var name="edgeMask" type="integer" dimensions="nEdges Time" units="none"
@@ -1411,6 +1424,10 @@ is the value of that variable from the *previous* time level!
 	       description="local indices of each vertex"
 	       persistence="scratch"
                />
+	  <var name="tmpMaskField" type="integer" dimensions="nCells" units="none"
+	       description="temporary mask for distributing calving flux"
+	       persistence="scratch"
+	       />
 	</var_struct>
 
 <!-- ================ -->

@@ -142,7 +142,7 @@ module li_time_integration_fe
 
 ! === restore damage ===========
       call mpas_timer_start("restore damage")
-      call restore_damage(domain, err_tmp)
+      !call restore_damage(domain, err_tmp)
       err = ior(err, err_tmp)
       call mpas_timer_stop("restore damage")
 
@@ -318,9 +318,9 @@ module li_time_integration_fe
       call mpas_pool_get_config(liConfigs, 'config_adaptive_timestep_include_DCFL', config_adaptive_timestep_include_DCFL)
       call mpas_pool_get_config(liConfigs, 'config_thickness_advection', config_thickness_advection)
 
-      if (trim(config_thickness_advection) == 'none') then
-         return ! skip this routine
-      endif
+      !if (trim(config_thickness_advection) == 'none') then
+      !   return ! skip this routine
+      !endif
 
       allowableAdvecDtAllProcs = 0.0_RKIND
       allowableDiffDtAllProcs = 0.0_RKIND

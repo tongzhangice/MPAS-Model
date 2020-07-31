@@ -275,6 +275,7 @@ contains
       integer, pointer :: nVertInterfaces
       real(KIND=RKIND), dimension(:), pointer :: thickness, bedTopography
       integer, dimension(:), pointer :: nEdgesOnCell, cellMask, vertexMask, edgeMask
+      real, dimension(:), pointer :: yCell
       integer, dimension(:,:), pointer :: cellsOnCell, cellsOnVertex, cellsOnEdge, dirichletVelocityMask
       real (kind=RKIND), pointer :: config_ice_density, config_ocean_density, &
             config_sea_level, config_dynamic_thickness
@@ -294,7 +295,7 @@ contains
       integer :: numDiriDynamicCells, numDiriNondynamicCells, numExtendedCells
       logical :: validVertex
       real (kind=RKIND) :: thinnestNeighborHeight
-      integer :: iCellNeighbor
+      integer :: iCellNeighbor, nNeighborMargin
       logical :: openOceanNeighbor
 
       call mpas_timer_start('calculate mask')
@@ -312,6 +313,7 @@ contains
       call mpas_pool_get_array(meshPool, 'cellsOnCell', cellsOnCell)
       call mpas_pool_get_array(meshPool, 'cellsOnVertex', cellsOnVertex)
       call mpas_pool_get_array(meshPool, 'cellsOnEdge', cellsOnEdge)
+      call mpas_pool_get_array(meshPool, 'yCell', yCell)
 
       call mpas_pool_get_array(geometryPool, 'bedTopography', bedTopography)
       call mpas_pool_get_array(geometryPool, 'cellMask', cellMask, timeLevel=1)
@@ -375,15 +377,41 @@ contains
           if (li_mask_is_margin(cellMask(i)) .and. li_mask_is_floating_ice(cellMask(i))) then
               openOceanNeighbor = .false.
               thinnestNeighborHeight = 1.0e36_RKIND
+              nNeighborMargin = 0
+              do j=1,nEdgesOnCell(i)
+                 iCellNeighbor = cellsOnCell(j,i)
+                 if (iCellNeighbor > 0) then
+                 if (thickness(iCellNeighbor) > 0.0_RKIND) then
+                     nNeighborMargin = nNeighborMargin + 1
+                 endif
+                 endif
+              enddo
+
               do j=1,nEdgesOnCell(i) ! Find height of thickest neighbor
                  iCellNeighbor = cellsOnCell(j,i)
-                 if (thickness(iCellNeighbor) > 0.0_RKIND .and. .not. li_mask_is_margin(cellMask(iCellNeighbor))) then
+                 if (iCellNeighbor > 0) then
+                 !if ((thickness(iCellNeighbor) > 0.0_RKIND .and. .not. li_mask_is_margin(cellMask(iCellNeighbor))) .or. & 
+                 !    ((thickness(iCellNeighbor) > 0.0_RKIND .and. nNeighborMargin == 2))) then
+                 !if (thickness(iCellNeighbor) > 0.0_RKIND .and. .not. li_mask_is_margin(cellMask(iCellNeighbor))) then
+
+                 if (thickness(iCellNeighbor) > 0.0_RKIND .and. .not. li_mask_is_margin(cellMask(iCellNeighbor))) then 
                     thinnestNeighborHeight = min(thinnestNeighborHeight, thickness(iCellNeighbor))
+                 !   nNeighborMargin = nNeighborMargin + 1 
                  endif
+
+                 if ((thickness(iCellNeighbor) > 0.0_RKIND .and. nNeighborMargin == 2)) then
+                     if (yCell(iCellNeighbor) == yCell(i)) then
+                     thinnestNeighborHeight = min(thinnestNeighborHeight, thickness(iCellNeighbor))
+                     endif
+                 endif
+
                  if ((bedTopography(iCellNeighbor) < config_sea_level) .and. (.not. li_mask_is_ice(cellMask(iCellNeighbor)))) then
                     openOceanNeighbor = .true.
                  endif
+                 endif
               enddo
+
+              !if ((openOceanNeighbor) .and. (thickness(i) < 0.95_RKIND * thinnestNeighborHeight) .and. (nNeighborMargin > 0)) then
               if ((openOceanNeighbor) .and. (thickness(i) < 0.95_RKIND * thinnestNeighborHeight)) then
                  ! Consider this NOT dynamic if the ice shelf margin is not almost as tall as it's inland neighbors.
                  ! Only do this for a non-dynamic cell adjacent to open ocean.
