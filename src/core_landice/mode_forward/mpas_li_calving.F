@@ -1230,6 +1230,8 @@ module li_calving
       integer, dimension(:), pointer :: nEdgesOnCell ! number of cells that border each cell
       integer :: err_tmp
       real :: max_yCell, min_yCell
+      type (field1dReal), pointer :: thicknessField
+      real, dimension(:), pointer :: thickness_tmp
 
       call mpas_pool_get_config(liConfigs, 'config_calving_thickness', config_calving_thickness)
       call mpas_pool_get_config(liConfigs, 'config_sea_level', config_sea_level)
@@ -1253,6 +1255,10 @@ module li_calving
       call mpas_pool_get_field(scratchPool, 'iceCellMask2',  calvingFrontMaskField)
       call mpas_allocate_scratch_field(calvingFrontMaskField, .true.)
       calvingFrontMask => calvingFrontMaskField % array
+
+      call mpas_pool_get_field(scratchPool, 'thicknessField',  thicknessField)
+      call mpas_allocate_scratch_field(thicknessField, .true.)
+      thickness_tmp => thicknessField % array
 
       ! make mask for effective calving front.
       ! This is last dynamic cell, but also make sure it has a neighbor that is open ocean or thin floating ice.
@@ -1306,6 +1312,8 @@ module li_calving
 
       ! === apply calving ===
       thickness(:) = thickness(:) - calvingThickness(:)
+      thickness_tmp = thickness
+      mpas_dmpar_exch_halo_field(thicknessField)
       !call calculate_calving_front_mask(meshPool, geometryPool, cellMaskFront)
 
       ! update mask

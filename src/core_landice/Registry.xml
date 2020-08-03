@@ -1392,6 +1392,10 @@ is the value of that variable from the *previous* time level!
 	       description="generic work array with dimensions of (nCells)"
 	       persistence="scratch"
 	       />
+	  <var name="thicknessField" type="real" dimensions="nCells" units="none"
+	       description="update halo for thickness (nCells)"
+	       persistence="scratch"
+	       />
 	  <var name="meanTField" type="real" dimensions="nCells" units="none"
 	       description="generic work array with dimensions of (nCells)"
 	       persistence="scratch"
